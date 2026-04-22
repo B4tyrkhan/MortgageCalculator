@@ -2,7 +2,6 @@ from kivy.lang import Builder
 from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty, ListProperty
 from kivy.clock import Clock
-from datetime import date
 
 from kivymd.app import MDApp
 from kivymd.theming import ThemableBehavior
@@ -10,8 +9,7 @@ from kivymd.uix.list import OneLineIconListItem, MDList
 from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.floatlayout import MDFloatLayout
 from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.pickers import MDDatePicker
-
+from kivymd.icon_definitions import md_icons
 
 KV = '''
 <ItemDrawer>:
@@ -114,13 +112,11 @@ Screen:
                                         icon: "calendar-month"
                                         theme_text_color: "Custom"
                                         text_color: 1, 1, 1, 1
-                                        on_release: app.open_date_picker()
 
                                     MDTextField:
                                         id: start_date
                                         hint_text: "Start date"
                                         color_mode: "custom"
-                                        readonly: True
 
                                 BoxLayout:
                                     orientation: "horizontal"
@@ -291,12 +287,11 @@ class ItemDrawer(OneLineIconListItem):
         self.parent.set_color_item(self)
 
 
-class DrawerList(MDList):
+class DrawerList(ThemableBehavior, MDList):
     def set_color_item(self, instance_item):
-        app = MDApp.get_running_app()
         for item in self.children:
-            item.text_color = app.theme_cls.text_color
-        instance_item.text_color = app.theme_cls.primary_color
+            item.text_color = self.theme_cls.text_color
+        instance_item.text_color = self.theme_cls.primary_color
 
 
 class MortgageCalculatorApp(MDApp):
@@ -359,16 +354,7 @@ class MortgageCalculatorApp(MDApp):
                 ItemDrawer(icon=icon_name, text=item_text)
             )
 
-        self.root.ids.start_date.text = date.today().strftime("%d.%m.%Y")
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
-
-    def open_date_picker(self):
-        picker = MDDatePicker()
-        picker.bind(on_save=self.on_save_date)
-        picker.open()
-
-    def on_save_date(self, instance, value, date_range):
-        self.root.ids.start_date.text = value.strftime("%d.%m.%Y")
 
     def set_textfield_colors(self, field, text_c, hint_c, line_c):
         field.text_color = text_c

@@ -86,7 +86,8 @@ Screen:
                         title: app.title
                         elevation: 10
                         left_action_items: [['menu', lambda x: nav_drawer.set_state("open")]]
-                        right_action_items: [["star-outline", lambda x: app.on_star_click()]]
+                        right_action_items: [["translate", lambda x: app.open_language_menu()],
+                                             ["star-outline", lambda x: app.on_star_click()]]
                         md_bg_color: 0, 0, 0, 1
                         specific_text_color: 1, 1, 1, 1
 
@@ -249,6 +250,7 @@ Screen:
                                     padding: "10dp", 0
 
                                     MDLabel:
+                                        id: graph_interest_legend
                                         text: "[color=0000ff]■[/color] Interest"
                                         markup: True
                                         halign: "center"
@@ -256,6 +258,7 @@ Screen:
                                         text_color: 1, 1, 1, 1
 
                                     MDLabel:
+                                        id: graph_principal_legend
                                         text: "[color=ff0000]■[/color] Principal"
                                         markup: True
                                         halign: "center"
@@ -292,6 +295,7 @@ Screen:
                                     padding: "10dp", 0
 
                                     MDLabel:
+                                        id: chart_interest_legend
                                         text: "[color=0000ff]■[/color] Interest"
                                         markup: True
                                         halign: "center"
@@ -299,6 +303,7 @@ Screen:
                                         text_color: 1, 1, 1, 1
 
                                     MDLabel:
+                                        id: chart_principal_legend
                                         text: "[color=ff0000]■[/color] Principal"
                                         markup: True
                                         halign: "center"
@@ -343,6 +348,12 @@ Screen:
                                     theme_text_color: "Custom"
                                     text_color: 1, 1, 1, 1
 
+                Widget:
+                    id: language_button
+                    size_hint: None, None
+                    size: 1, 1
+                    pos: 0, 0
+
         MDNavigationDrawer:
             id: nav_drawer
 
@@ -366,8 +377,13 @@ class ItemDrawer(OneLineIconListItem):
 
     def on_release(self):
         app = MDApp.get_running_app()
-        if self.text == "Dark/Light":
+
+        if self.text in [app.tr("dark_light"), "Dark/Light", "Тема", "Ашық/Қараңғы"]:
             app.toggle_theme()
+
+        elif self.text in [app.tr("language"), "Language", "Язык", "Тіл"]:
+            app.open_language_menu()
+
         self.parent.set_color_item(self)
 
 
@@ -386,17 +402,134 @@ class MortgageCalculatorApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.menu = None
+        self.language_menu = None
         self.screen = None
         self.table_widget = None
         self.graph_data = []
         self.chart_interest_total = 0.0
         self.chart_principal_total = 0.0
+        self.current_language = "kz"
+
+        self.translations = {
+            "en": {
+                "title": "Mortgage Calculator",
+                "author": "author Aliev Batyrkhann",
+                "input": "Input",
+                "table": "Table",
+                "graph": "Graph",
+                "chart": "Chart",
+                "sum": "Sum",
+                "start_date": "Start date",
+                "loan": "Loan",
+                "months": "Months",
+                "interest": "Interest, %",
+                "payment_type": "Payment type",
+                "calc": "Calc",
+                "graph_payments": "Graph payments",
+                "chart_payments": "Chart payments",
+                "total_amount": "Total amount of payments",
+                "overpayment": "Overpayment loan",
+                "effective_rate": "Effective interest rate",
+                "about_author": "About author",
+                "my_youtube": "My YouTube",
+                "donate_author": "Donate author",
+                "source_code": "Source code",
+                "share_app": "Share app",
+                "dark_light": "Dark/Light",
+                "language": "Language",
+                "monthly_payment": "Monthly payment",
+                "first_payment": "First payment",
+                "fill_all_fields": "Fill all fields",
+                "wrong_numbers": "Wrong numbers",
+                "values_invalid": "Values must be valid",
+                "interest_legend": "Interest",
+                "principal_legend": "Principal",
+                "payment_type_annuity": "annuity",
+                "payment_type_diff": "differentiated",
+            },
+            "ru": {
+                "title": "Ипотечный калькулятор",
+                "author": "автор Алиев Батырхан",
+                "input": "Ввод",
+                "table": "Таблица",
+                "graph": "График",
+                "chart": "Диаграмма",
+                "sum": "Итог",
+                "start_date": "Дата начала",
+                "loan": "Сумма кредита",
+                "months": "Месяцы",
+                "interest": "Процент, %",
+                "payment_type": "Тип платежа",
+                "calc": "Рассчитать",
+                "graph_payments": "График платежей",
+                "chart_payments": "Диаграмма платежей",
+                "total_amount": "Общая сумма выплат",
+                "overpayment": "Переплата",
+                "effective_rate": "Эффективная ставка",
+                "about_author": "Об авторе",
+                "my_youtube": "Мой YouTube",
+                "donate_author": "Поддержать автора",
+                "source_code": "Исходный код",
+                "share_app": "Поделиться",
+                "dark_light": "Тема",
+                "language": "Язык",
+                "monthly_payment": "Ежемесячный платеж",
+                "first_payment": "Первый платеж",
+                "fill_all_fields": "Заполните все поля",
+                "wrong_numbers": "Неверные числа",
+                "values_invalid": "Некорректные значения",
+                "interest_legend": "Проценты",
+                "principal_legend": "Основной долг",
+                "payment_type_annuity": "аннуитет",
+                "payment_type_diff": "дифференцированный",
+            },
+            "kz": {
+                "title": "Ипотекалық калькулятор",
+                "author": "автор Алиев Батырхан",
+                "input": "Енгізу",
+                "table": "Кесте",
+                "graph": "График",
+                "chart": "Диаграмма",
+                "sum": "Қорытынды",
+                "start_date": "Басталу күні",
+                "loan": "Несие сомасы",
+                "months": "Ай саны",
+                "interest": "Пайыз, %",
+                "payment_type": "Төлем түрі",
+                "calc": "Есептеу",
+                "graph_payments": "Төлем графигі",
+                "chart_payments": "Төлем диаграммасы",
+                "total_amount": "Жалпы төлем сомасы",
+                "overpayment": "Артық төлем",
+                "effective_rate": "Тиімді мөлшерлеме",
+                "about_author": "Автор туралы",
+                "my_youtube": "Менің YouTube арнам",
+                "donate_author": "Авторды қолдау",
+                "source_code": "Бастапқы код",
+                "share_app": "Қосымшамен бөлісу",
+                "dark_light": "Ашық/Қараңғы",
+                "language": "Тіл",
+                "monthly_payment": "Ай сайынғы төлем",
+                "first_payment": "Бірінші төлем",
+                "fill_all_fields": "Барлық өрістерді толтырыңыз",
+                "wrong_numbers": "Қате сандар",
+                "values_invalid": "Мәндер қате",
+                "interest_legend": "Пайыз",
+                "principal_legend": "Негізгі қарыз",
+                "payment_type_annuity": "аннуитет",
+                "payment_type_diff": "сараланған",
+            },
+        }
+
+    def tr(self, key):
+        return self.translations.get(self.current_language, {}).get(key, key)
 
     def build(self):
         self.theme_cls.primary_palette = "Orange"
         self.theme_cls.theme_style = "Dark"
         self.screen = Builder.load_string(KV)
         Clock.schedule_once(self.setup_menu, 0.2)
+        Clock.schedule_once(self.setup_language_menu, 0.2)
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
         Clock.schedule_once(self.bind_graph_widget, 0.3)
         Clock.schedule_once(self.bind_chart_widget, 0.3)
@@ -418,17 +551,72 @@ class MortgageCalculatorApp(MDApp):
             items=[
                 {
                     "viewclass": "OneLineListItem",
-                    "text": "annuity",
+                    "text": self.tr("payment_type_annuity"),
                     "on_release": lambda: self.set_payment_type("annuity"),
                 },
                 {
                     "viewclass": "OneLineListItem",
-                    "text": "differentiated",
+                    "text": self.tr("payment_type_diff"),
                     "on_release": lambda: self.set_payment_type("differentiated"),
                 },
             ],
             width_mult=4,
         )
+
+    def refresh_payment_menu(self):
+        if self.menu:
+            self.menu.dismiss()
+
+        self.menu = MDDropdownMenu(
+            caller=self.screen.ids.payment_type,
+            items=[
+                {
+                    "viewclass": "OneLineListItem",
+                    "text": self.tr("payment_type_annuity"),
+                    "on_release": lambda: self.set_payment_type("annuity"),
+                },
+                {
+                    "viewclass": "OneLineListItem",
+                    "text": self.tr("payment_type_diff"),
+                    "on_release": lambda: self.set_payment_type("differentiated"),
+                },
+            ],
+            width_mult=4,
+        )
+
+    def setup_language_menu(self, *args):
+        self.language_menu = MDDropdownMenu(
+            caller=self.screen.ids.language_button,
+            items=[
+                {
+                    "viewclass": "OneLineListItem",
+                    "text": "English",
+                    "on_release": lambda: self.set_language("en"),
+                },
+                {
+                    "viewclass": "OneLineListItem",
+                    "text": "Русский",
+                    "on_release": lambda: self.set_language("ru"),
+                },
+                {
+                    "viewclass": "OneLineListItem",
+                    "text": "Қазақша",
+                    "on_release": lambda: self.set_language("kz"),
+                },
+            ],
+            width_mult=4,
+        )
+
+    def open_language_menu(self):
+        if self.language_menu:
+            self.language_menu.caller = self.screen.ids.language_button
+            self.language_menu.open()
+
+    def set_language(self, lang_code):
+        self.current_language = lang_code
+        if self.language_menu:
+            self.language_menu.dismiss()
+        self.apply_language()
 
     def open_payment_menu(self):
         if self.menu:
@@ -436,32 +624,83 @@ class MortgageCalculatorApp(MDApp):
             self.menu.open()
 
     def set_payment_type(self, value):
-        self.screen.ids.payment_type.text = value
+        self.screen.ids.payment_type.text = self.tr("payment_type_annuity") if value == "annuity" else self.tr("payment_type_diff")
         self.screen.ids.payment_type.focus = False
+        self.screen.ids.payment_type._payment_type_value = value
         if self.menu:
             self.menu.dismiss()
 
-    def on_start(self):
+    def get_payment_type_value(self):
+        if hasattr(self.screen.ids.payment_type, "_payment_type_value"):
+            return self.screen.ids.payment_type._payment_type_value
+        return "annuity"
+
+    def rebuild_drawer(self):
+        md_list = self.screen.ids.content_drawer.ids.md_list
+        md_list.clear_widgets()
+
         menu_items = {
-            "account-cowboy-hat": "About author",
-            "youtube": "My YouTube",
-            "coffee": "Donate author",
-            "github": "Source code",
-            "share-variant": "Share app",
-            "shield-sun": "Dark/Light",
+            "account-cowboy-hat": self.tr("about_author"),
+            "youtube": self.tr("my_youtube"),
+            "coffee": self.tr("donate_author"),
+            "github": self.tr("source_code"),
+            "share-variant": self.tr("share_app"),
+            "shield-sun": self.tr("dark_light"),
+            "translate": self.tr("language"),
         }
 
         for icon_name, item_text in menu_items.items():
-            self.screen.ids.content_drawer.ids.md_list.add_widget(
-                ItemDrawer(icon=icon_name, text=item_text)
-            )
+            md_list.add_widget(ItemDrawer(icon=icon_name, text=item_text))
 
+    def apply_language(self):
+        self.title = self.tr("title")
+        self.by_who = self.tr("author")
+
+        self.screen.ids.toolbar.title = self.tr("title")
+        self.screen.ids.content_drawer.ids.app_title_label.text = self.tr("title")
+        self.screen.ids.content_drawer.ids.app_author_label.text = self.tr("author")
+
+        self.screen.ids.start_date.hint_text = self.tr("start_date")
+        self.screen.ids.loan.hint_text = self.tr("loan")
+        self.screen.ids.months.hint_text = self.tr("months")
+        self.screen.ids.interest.hint_text = self.tr("interest")
+        self.screen.ids.payment_type.hint_text = self.tr("payment_type")
+        self.screen.ids.calc_button.text = self.tr("calc")
+
+        self.screen.ids.table_label.text = self.tr("table")
+        self.screen.ids.graph_label.text = self.tr("graph_payments")
+        self.screen.ids.chart_label.text = self.tr("chart_payments")
+        self.screen.ids.sum_label.text = self.tr("sum")
+
+        self.screen.ids.total_amount_label.text = f"{self.tr('total_amount')}: "
+        self.screen.ids.overpayment_label.text = f"{self.tr('overpayment')}: "
+        self.screen.ids.effective_rate_label.text = f"{self.tr('effective_rate')}: "
+
+        self.screen.ids.graph_interest_legend.text = f"[color=0000ff]■[/color] {self.tr('interest_legend')}"
+        self.screen.ids.graph_principal_legend.text = f"[color=ff0000]■[/color] {self.tr('principal_legend')}"
+        self.screen.ids.chart_interest_legend.text = f"[color=0000ff]■[/color] {self.tr('interest_legend')}"
+        self.screen.ids.chart_principal_legend.text = f"[color=ff0000]■[/color] {self.tr('principal_legend')}"
+
+        tabs = self.screen.ids.tabs.get_tab_list()
+        if len(tabs) >= 5:
+            tabs[4].text = self.tr("sum")
+            tabs[3].text = self.tr("chart")
+            tabs[2].text = self.tr("graph")
+            tabs[1].text = self.tr("table")
+            tabs[0].text = self.tr("input")
+
+        current_type = self.get_payment_type_value()
+        self.refresh_payment_menu()
+        self.set_payment_type(current_type)
+        self.rebuild_drawer()
+
+    def on_start(self):
         self.screen.ids.start_date.text = datetime.date.today().strftime("%d-%m-%Y")
         self.screen.ids.loan.text = "5000000"
         self.screen.ids.months.text = "120"
         self.screen.ids.interest.text = "9.5"
-        self.screen.ids.payment_type.text = "annuity"
-
+        self.screen.ids.payment_type._payment_type_value = "annuity"
+        self.apply_language()
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
 
     def get_date(self, date_obj):
@@ -553,10 +792,10 @@ class MortgageCalculatorApp(MDApp):
 
         instance_tab_label.color = active
 
-        if tab_text == "Graph":
+        if tab_text in ["Graph", "График"]:
             Clock.schedule_once(lambda dt: self.draw_graph(), 0.05)
 
-        if tab_text == "Chart":
+        if tab_text in ["Chart", "Диаграмма"]:
             Clock.schedule_once(lambda dt: self.draw_chart(), 0.05)
 
     def add_months(self, source_date, months):
@@ -639,16 +878,10 @@ class MortgageCalculatorApp(MDApp):
                 interest_h = (interest / max_total) * chart_h
 
                 Color(1, 0, 0, 1)
-                Rectangle(
-                    pos=(current_x, chart_y),
-                    size=(bar_w, principal_h)
-                )
+                Rectangle(pos=(current_x, chart_y), size=(bar_w, principal_h))
 
                 Color(0, 0, 1, 1)
-                Rectangle(
-                    pos=(current_x, chart_y + principal_h),
-                    size=(bar_w, interest_h)
-                )
+                Rectangle(pos=(current_x, chart_y + principal_h), size=(bar_w, interest_h))
 
                 current_x += bar_w + gap
 
@@ -700,10 +933,10 @@ class MortgageCalculatorApp(MDApp):
         months_text = self.screen.ids.months.text.strip()
         interest_text = self.screen.ids.interest.text.strip()
         start_date_text = self.screen.ids.start_date.text.strip()
-        payment_type = self.screen.ids.payment_type.text.strip()
+        payment_type = self.get_payment_type_value()
 
         if not loan_text or not months_text or not interest_text or not start_date_text:
-            self.screen.ids.result_label.text = "Fill all fields"
+            self.screen.ids.result_label.text = self.tr("fill_all_fields")
             return
 
         try:
@@ -712,11 +945,11 @@ class MortgageCalculatorApp(MDApp):
             interest = float(interest_text)
             start_date = datetime.datetime.strptime(start_date_text, "%d-%m-%Y").date()
         except ValueError:
-            self.screen.ids.result_label.text = "Wrong numbers"
+            self.screen.ids.result_label.text = self.tr("wrong_numbers")
             return
 
         if loan <= 0 or months <= 0 or interest < 0:
-            self.screen.ids.result_label.text = "Values must be valid"
+            self.screen.ids.result_label.text = self.tr("values_invalid")
             return
 
         monthly_rate = interest / 100 / 12
@@ -765,7 +998,7 @@ class MortgageCalculatorApp(MDApp):
                     "principal": repayment_of_loan_body,
                 })
 
-            self.screen.ids.result_label.text = f"Monthly payment: {monthly_payment:.2f}"
+            self.screen.ids.result_label.text = f"{self.tr('monthly_payment')}: {monthly_payment:.2f}"
 
         else:
             repayment_of_loan_body_const = loan / months
@@ -798,14 +1031,14 @@ class MortgageCalculatorApp(MDApp):
                     "principal": repayment_of_loan_body_const,
                 })
 
-            self.screen.ids.result_label.text = f"First payment: {rows[0][2]}"
+            self.screen.ids.result_label.text = f"{self.tr('first_payment')}: {rows[0][2]}"
 
         overpayment_loan = total_amount_of_payments - loan
         effective_interest_rate = (total_amount_of_payments / loan - 1) * 100
 
-        self.screen.ids.total_amount_label.text = f"Total amount of payments: {total_amount_of_payments:.2f}"
-        self.screen.ids.overpayment_label.text = f"Overpayment loan: {overpayment_loan:.2f}"
-        self.screen.ids.effective_rate_label.text = f"Effective interest rate: {effective_interest_rate:.2f}%"
+        self.screen.ids.total_amount_label.text = f"{self.tr('total_amount')}: {total_amount_of_payments:.2f}"
+        self.screen.ids.overpayment_label.text = f"{self.tr('overpayment')}: {overpayment_loan:.2f}"
+        self.screen.ids.effective_rate_label.text = f"{self.tr('effective_rate')}: {effective_interest_rate:.2f}%"
 
         self.graph_data = graph_data
         self.chart_interest_total = total_interest

@@ -299,7 +299,7 @@ class DrawerList(MDList):
 
 class MortgageCalculatorApp(MDApp):
     title = "Mortgage Calculator"
-    by_who = "author Olke Asylzhan"
+    by_who = "author Aliev Batyrkhan"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

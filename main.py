@@ -5,7 +5,7 @@ from kivy.clock import Clock
 from datetime import date
 
 from kivymd.app import MDApp
-from kivymd.theming import ThemableBehavior
+
 from kivymd.uix.list import OneLineIconListItem, MDList
 from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.floatlayout import MDFloatLayout
@@ -291,11 +291,12 @@ class ItemDrawer(OneLineIconListItem):
         self.parent.set_color_item(self)
 
 
-class DrawerList(ThemableBehavior, MDList):
+class DrawerList(MDList):
     def set_color_item(self, instance_item):
+        app = MDApp.get_running_app()
         for item in self.children:
-            item.text_color = self.theme_cls.text_color
-        instance_item.text_color = self.theme_cls.primary_color
+            item.text_color = app.theme_cls.text_color
+        instance_item.text_color = app.theme_cls.primary_color
 
 
 class MortgageCalculatorApp(MDApp):

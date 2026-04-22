@@ -3,7 +3,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty, ListProperty
 from kivy.clock import Clock
 from kivy.metrics import dp
-from kivy.graphics import Color, Rectangle, Line
+from kivy.graphics import Color, Rectangle, Line, Ellipse
 import datetime
 import calendar
 
@@ -270,13 +270,40 @@ Screen:
                             BoxLayout:
                                 orientation: "vertical"
                                 padding: "16dp"
+                                spacing: "10dp"
 
                                 MDLabel:
                                     id: chart_label
-                                    text: "Chart"
+                                    text: "Chart payments"
                                     halign: "center"
                                     theme_text_color: "Custom"
                                     text_color: 1, 1, 1, 1
+                                    size_hint_y: None
+                                    height: "30dp"
+
+                                Widget:
+                                    id: chart_widget
+
+                                BoxLayout:
+                                    orientation: "horizontal"
+                                    size_hint_y: None
+                                    height: "30dp"
+                                    spacing: "20dp"
+                                    padding: "10dp", 0
+
+                                    MDLabel:
+                                        text: "[color=0000ff]■[/color] Interest"
+                                        markup: True
+                                        halign: "center"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
+
+                                    MDLabel:
+                                        text: "[color=ff0000]■[/color] Principal"
+                                        markup: True
+                                        halign: "center"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
 
                         Tab:
                             id: tab_sum
@@ -362,6 +389,8 @@ class MortgageCalculatorApp(MDApp):
         self.screen = None
         self.table_widget = None
         self.graph_data = []
+        self.chart_interest_total = 0.0
+        self.chart_principal_total = 0.0
 
     def build(self):
         self.theme_cls.primary_palette = "Orange"
@@ -370,12 +399,18 @@ class MortgageCalculatorApp(MDApp):
         Clock.schedule_once(self.setup_menu, 0.2)
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
         Clock.schedule_once(self.bind_graph_widget, 0.3)
+        Clock.schedule_once(self.bind_chart_widget, 0.3)
         return self.screen
 
     def bind_graph_widget(self, *args):
         graph_widget = self.screen.ids.graph_widget
         graph_widget.bind(pos=lambda *x: self.draw_graph())
         graph_widget.bind(size=lambda *x: self.draw_graph())
+
+    def bind_chart_widget(self, *args):
+        chart_widget = self.screen.ids.chart_widget
+        chart_widget.bind(pos=lambda *x: self.draw_chart())
+        chart_widget.bind(size=lambda *x: self.draw_chart())
 
     def setup_menu(self, *args):
         self.menu = MDDropdownMenu(
@@ -503,6 +538,7 @@ class MortgageCalculatorApp(MDApp):
         self.theme_cls.theme_style = "Light" if self.theme_cls.theme_style == "Dark" else "Dark"
         Clock.schedule_once(self.refresh_ui_colors, 0.1)
         Clock.schedule_once(lambda dt: self.draw_graph(), 0.15)
+        Clock.schedule_once(lambda dt: self.draw_chart(), 0.15)
 
     def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
         if self.theme_cls.theme_style == "Dark":
@@ -519,6 +555,9 @@ class MortgageCalculatorApp(MDApp):
 
         if tab_text == "Graph":
             Clock.schedule_once(lambda dt: self.draw_graph(), 0.05)
+
+        if tab_text == "Chart":
+            Clock.schedule_once(lambda dt: self.draw_chart(), 0.05)
 
     def add_months(self, source_date, months):
         month = source_date.month - 1 + months
@@ -613,6 +652,49 @@ class MortgageCalculatorApp(MDApp):
 
                 current_x += bar_w + gap
 
+    def draw_chart(self):
+        chart_widget = self.screen.ids.chart_widget
+        chart_widget.canvas.after.clear()
+
+        interest = self.chart_interest_total
+        principal = self.chart_principal_total
+        total = interest + principal
+
+        if total <= 0:
+            return
+
+        x = chart_widget.x
+        y = chart_widget.y
+        w = chart_widget.width
+        h = chart_widget.height
+
+        if w <= 0 or h <= 0:
+            return
+
+        size = min(w, h) * 0.9
+        pie_x = x + (w - size) / 2
+        pie_y = y + (h - size) / 2
+
+        interest_angle = 360 * (interest / total)
+        principal_angle = 360 - interest_angle
+
+        with chart_widget.canvas.after:
+            Color(1, 0, 0, 1)
+            Ellipse(
+                pos=(pie_x, pie_y),
+                size=(size, size),
+                angle_start=0,
+                angle_end=principal_angle,
+            )
+
+            Color(0, 0, 1, 1)
+            Ellipse(
+                pos=(pie_x, pie_y),
+                size=(size, size),
+                angle_start=principal_angle,
+                angle_end=360,
+            )
+
     def calculate(self):
         loan_text = self.screen.ids.loan.text.strip()
         months_text = self.screen.ids.months.text.strip()
@@ -643,6 +725,8 @@ class MortgageCalculatorApp(MDApp):
         graph_data = []
         debt = loan
         total_amount_of_payments = 0.0
+        total_interest = 0.0
+        total_principal = 0.0
 
         if payment_type == "annuity":
             if monthly_rate == 0:
@@ -663,6 +747,8 @@ class MortgageCalculatorApp(MDApp):
                     debt = 0
 
                 total_amount_of_payments += monthly_payment
+                total_interest += repayment_of_interest
+                total_principal += repayment_of_loan_body
 
                 rows.append((
                     str(i + 1),
@@ -694,6 +780,8 @@ class MortgageCalculatorApp(MDApp):
                     debt = 0
 
                 total_amount_of_payments += monthly_payment
+                total_interest += repayment_of_interest
+                total_principal += repayment_of_loan_body_const
 
                 rows.append((
                     str(i + 1),
@@ -720,8 +808,12 @@ class MortgageCalculatorApp(MDApp):
         self.screen.ids.effective_rate_label.text = f"Effective interest rate: {effective_interest_rate:.2f}%"
 
         self.graph_data = graph_data
+        self.chart_interest_total = total_interest
+        self.chart_principal_total = total_principal
+
         self.show_table(rows)
         Clock.schedule_once(lambda dt: self.draw_graph(), 0.05)
+        Clock.schedule_once(lambda dt: self.draw_chart(), 0.05)
 
     def on_star_click(self):
         print("star clicked!")

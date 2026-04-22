@@ -3,6 +3,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty, ListProperty
 from kivy.clock import Clock
 from kivy.metrics import dp
+from kivy.graphics import Color, Rectangle, Line
 import datetime
 import calendar
 
@@ -226,13 +227,40 @@ Screen:
                             BoxLayout:
                                 orientation: "vertical"
                                 padding: "16dp"
+                                spacing: "10dp"
 
                                 MDLabel:
                                     id: graph_label
-                                    text: "Graph"
+                                    text: "Graph payments"
                                     halign: "center"
                                     theme_text_color: "Custom"
                                     text_color: 1, 1, 1, 1
+                                    size_hint_y: None
+                                    height: "30dp"
+
+                                Widget:
+                                    id: graph_widget
+
+                                BoxLayout:
+                                    orientation: "horizontal"
+                                    size_hint_y: None
+                                    height: "30dp"
+                                    spacing: "20dp"
+                                    padding: "10dp", 0
+
+                                    MDLabel:
+                                        text: "[color=0000ff]■[/color] Interest"
+                                        markup: True
+                                        halign: "center"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
+
+                                    MDLabel:
+                                        text: "[color=ff0000]■[/color] Principal"
+                                        markup: True
+                                        halign: "center"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
 
                         Tab:
                             id: tab_chart
@@ -333,6 +361,7 @@ class MortgageCalculatorApp(MDApp):
         self.menu = None
         self.screen = None
         self.table_widget = None
+        self.graph_data = []
 
     def build(self):
         self.theme_cls.primary_palette = "Orange"
@@ -340,7 +369,13 @@ class MortgageCalculatorApp(MDApp):
         self.screen = Builder.load_string(KV)
         Clock.schedule_once(self.setup_menu, 0.2)
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
+        Clock.schedule_once(self.bind_graph_widget, 0.3)
         return self.screen
+
+    def bind_graph_widget(self, *args):
+        graph_widget = self.screen.ids.graph_widget
+        graph_widget.bind(pos=lambda *x: self.draw_graph())
+        graph_widget.bind(size=lambda *x: self.draw_graph())
 
     def setup_menu(self, *args):
         self.menu = MDDropdownMenu(
@@ -467,6 +502,7 @@ class MortgageCalculatorApp(MDApp):
     def toggle_theme(self):
         self.theme_cls.theme_style = "Light" if self.theme_cls.theme_style == "Dark" else "Dark"
         Clock.schedule_once(self.refresh_ui_colors, 0.1)
+        Clock.schedule_once(lambda dt: self.draw_graph(), 0.15)
 
     def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
         if self.theme_cls.theme_style == "Dark":
@@ -480,6 +516,9 @@ class MortgageCalculatorApp(MDApp):
             lbl.color = normal
 
         instance_tab_label.color = active
+
+        if tab_text == "Graph":
+            Clock.schedule_once(lambda dt: self.draw_graph(), 0.05)
 
     def add_months(self, source_date, months):
         month = source_date.month - 1 + months
@@ -509,6 +548,71 @@ class MortgageCalculatorApp(MDApp):
         )
         table_box.add_widget(self.table_widget)
 
+    def draw_graph(self):
+        graph_widget = self.screen.ids.graph_widget
+        graph_widget.canvas.after.clear()
+
+        if not self.graph_data:
+            return
+
+        x = graph_widget.x
+        y = graph_widget.y
+        w = graph_widget.width
+        h = graph_widget.height
+
+        if w <= 0 or h <= 0:
+            return
+
+        left_pad = dp(10)
+        right_pad = dp(10)
+        top_pad = dp(10)
+        bottom_pad = dp(10)
+
+        chart_x = x + left_pad
+        chart_y = y + bottom_pad
+        chart_w = w - left_pad - right_pad
+        chart_h = h - top_pad - bottom_pad
+
+        if chart_w <= 0 or chart_h <= 0:
+            return
+
+        max_total = max(item["principal"] + item["interest"] for item in self.graph_data)
+        if max_total <= 0:
+            return
+
+        count = len(self.graph_data)
+        gap = dp(2)
+        bar_w = max((chart_w - gap * (count - 1)) / count, 1)
+
+        axis_color = (1, 1, 1, 1) if self.theme_cls.theme_style == "Dark" else (0, 0, 0, 1)
+
+        with graph_widget.canvas.after:
+            Color(*axis_color)
+            Line(points=[chart_x, chart_y, chart_x, chart_y + chart_h], width=1.2)
+            Line(points=[chart_x, chart_y, chart_x + chart_w, chart_y], width=1.2)
+
+            current_x = chart_x
+            for item in self.graph_data:
+                principal = item["principal"]
+                interest = item["interest"]
+
+                principal_h = (principal / max_total) * chart_h
+                interest_h = (interest / max_total) * chart_h
+
+                Color(1, 0, 0, 1)
+                Rectangle(
+                    pos=(current_x, chart_y),
+                    size=(bar_w, principal_h)
+                )
+
+                Color(0, 0, 1, 1)
+                Rectangle(
+                    pos=(current_x, chart_y + principal_h),
+                    size=(bar_w, interest_h)
+                )
+
+                current_x += bar_w + gap
+
     def calculate(self):
         loan_text = self.screen.ids.loan.text.strip()
         months_text = self.screen.ids.months.text.strip()
@@ -536,6 +640,7 @@ class MortgageCalculatorApp(MDApp):
         monthly_rate = interest / 100 / 12
 
         rows = []
+        graph_data = []
         debt = loan
         total_amount_of_payments = 0.0
 
@@ -568,6 +673,12 @@ class MortgageCalculatorApp(MDApp):
                     f"{debt:.2f}",
                 ))
 
+                graph_data.append({
+                    "month": i + 1,
+                    "interest": repayment_of_interest,
+                    "principal": repayment_of_loan_body,
+                })
+
             self.screen.ids.result_label.text = f"Monthly payment: {monthly_payment:.2f}"
 
         else:
@@ -593,6 +704,12 @@ class MortgageCalculatorApp(MDApp):
                     f"{debt:.2f}",
                 ))
 
+                graph_data.append({
+                    "month": i + 1,
+                    "interest": repayment_of_interest,
+                    "principal": repayment_of_loan_body_const,
+                })
+
             self.screen.ids.result_label.text = f"First payment: {rows[0][2]}"
 
         overpayment_loan = total_amount_of_payments - loan
@@ -602,7 +719,9 @@ class MortgageCalculatorApp(MDApp):
         self.screen.ids.overpayment_label.text = f"Overpayment loan: {overpayment_loan:.2f}"
         self.screen.ids.effective_rate_label.text = f"Effective interest rate: {effective_interest_rate:.2f}%"
 
+        self.graph_data = graph_data
         self.show_table(rows)
+        Clock.schedule_once(lambda dt: self.draw_graph(), 0.05)
 
     def on_star_click(self):
         print("star clicked!")

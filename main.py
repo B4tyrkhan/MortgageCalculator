@@ -382,13 +382,7 @@ class MortgageCalculatorApp(MDApp):
         date_dialog.bind(on_save=self.on_save, on_cancel=self.on_cancel)
         date_dialog.open()
 
-    def set_textfield_colors(self, field, text_c, hint_c, line_c):
-        field.text_color = text_c
-        field.line_color_normal = line_c
-        field.line_color_focus = line_c
-        field.current_hint_text_color = hint_c
-        field.hint_text_color_normal = hint_c
-        field.helper_text_mode = "none"
+    
 
     def refresh_ui_colors(self, *args):
         toolbar = self.screen.ids.toolbar

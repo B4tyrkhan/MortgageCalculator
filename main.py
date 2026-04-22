@@ -2,14 +2,14 @@ from kivy.lang import Builder
 from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty, ListProperty
 from kivy.clock import Clock
+import datetime
 
 from kivymd.app import MDApp
-from kivymd.theming import ThemableBehavior
 from kivymd.uix.list import OneLineIconListItem, MDList
 from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.floatlayout import MDFloatLayout
 from kivymd.uix.menu import MDDropdownMenu
-from kivymd.icon_definitions import md_icons
+from kivymd.uix.pickers import MDDatePicker
 
 KV = '''
 <ItemDrawer>:
@@ -76,7 +76,7 @@ Screen:
                 BoxLayout:
                     orientation: "vertical"
 
-                    MDToolbar:
+                    MDTopAppBar:
                         id: toolbar
                         title: app.title
                         elevation: 10
@@ -112,11 +112,13 @@ Screen:
                                         icon: "calendar-month"
                                         theme_text_color: "Custom"
                                         text_color: 1, 1, 1, 1
+                                        on_release: app.show_date_picker()
 
                                     MDTextField:
                                         id: start_date
                                         hint_text: "Start date"
                                         color_mode: "custom"
+                                        readonly: True
 
                                 BoxLayout:
                                     orientation: "horizontal"
@@ -182,7 +184,7 @@ Screen:
 
                                 MDRaisedButton:
                                     id: calc_button
-                                    text: "Calculate"
+                                    text: "Test Ok"
                                     pos_hint: {"center_x": 0.5}
                                     on_release: app.calculate()
 
@@ -287,11 +289,12 @@ class ItemDrawer(OneLineIconListItem):
         self.parent.set_color_item(self)
 
 
-class DrawerList(ThemableBehavior, MDList):
+class DrawerList(MDList):
     def set_color_item(self, instance_item):
+        app = MDApp.get_running_app()
         for item in self.children:
-            item.text_color = self.theme_cls.text_color
-        instance_item.text_color = self.theme_cls.primary_color
+            item.text_color = app.theme_cls.text_color
+        instance_item.text_color = app.theme_cls.primary_color
 
 
 class MortgageCalculatorApp(MDApp):
@@ -301,18 +304,19 @@ class MortgageCalculatorApp(MDApp):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.menu = None
+        self.screen = None
 
     def build(self):
         self.theme_cls.primary_palette = "Orange"
         self.theme_cls.theme_style = "Dark"
-        root = Builder.load_string(KV)
+        self.screen = Builder.load_string(KV)
         Clock.schedule_once(self.setup_menu, 0.2)
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
-        return root
+        return self.screen
 
     def setup_menu(self, *args):
         self.menu = MDDropdownMenu(
-            caller=self.root.ids.payment_type,
+            caller=self.screen.ids.payment_type,
             items=[
                 {
                     "viewclass": "OneLineListItem",
@@ -330,12 +334,12 @@ class MortgageCalculatorApp(MDApp):
 
     def open_payment_menu(self):
         if self.menu:
-            self.menu.caller = self.root.ids.payment_type
+            self.menu.caller = self.screen.ids.payment_type
             self.menu.open()
 
     def set_payment_type(self, value):
-        self.root.ids.payment_type.text = value
-        self.root.ids.payment_type.focus = False
+        self.screen.ids.payment_type.text = value
+        self.screen.ids.payment_type.focus = False
         if self.menu:
             self.menu.dismiss()
 
@@ -350,11 +354,33 @@ class MortgageCalculatorApp(MDApp):
         }
 
         for icon_name, item_text in menu_items.items():
-            self.root.ids.content_drawer.ids.md_list.add_widget(
+            self.screen.ids.content_drawer.ids.md_list.add_widget(
                 ItemDrawer(icon=icon_name, text=item_text)
             )
 
+        self.screen.ids.start_date.text = datetime.date.today().strftime("%d-%m-%Y")
+        self.screen.ids.loan.text = "5000000"
+        self.screen.ids.months.text = "120"
+        self.screen.ids.interest.text = "9.5"
+        self.screen.ids.payment_type.text = "annuity"
+
         Clock.schedule_once(self.refresh_ui_colors, 0.2)
+
+    def get_date(self, date_obj):
+        print(date_obj)
+        self.screen.ids.start_date.text = date_obj.strftime("%d-%m-%Y")
+
+    def on_save(self, instance, value, date_range):
+        print(instance, value, date_range)
+        self.get_date(value)
+
+    def on_cancel(self, instance, value):
+        print("Date picker canceled")
+
+    def show_date_picker(self):
+        date_dialog = MDDatePicker()
+        date_dialog.bind(on_save=self.on_save, on_cancel=self.on_cancel)
+        date_dialog.open()
 
     def set_textfield_colors(self, field, text_c, hint_c, line_c):
         field.text_color = text_c
@@ -365,9 +391,9 @@ class MortgageCalculatorApp(MDApp):
         field.helper_text_mode = "none"
 
     def refresh_ui_colors(self, *args):
-        toolbar = self.root.ids.toolbar
-        tabs = self.root.ids.tabs
-        drawer = self.root.ids.content_drawer
+        toolbar = self.screen.ids.toolbar
+        tabs = self.screen.ids.tabs
+        drawer = self.screen.ids.content_drawer
 
         if self.theme_cls.theme_style == "Dark":
             bg_tabs = [0.10, 0.10, 0.10, 1]
@@ -395,20 +421,20 @@ class MortgageCalculatorApp(MDApp):
         drawer.ids.app_title_label.text_color = fg_main
         drawer.ids.app_author_label.text_color = fg_soft
 
-        self.root.ids.table_label.text_color = fg_main
-        self.root.ids.graph_label.text_color = fg_main
-        self.root.ids.chart_label.text_color = fg_main
-        self.root.ids.sum_label.text_color = fg_main
-        self.root.ids.result_label.text_color = fg_main
+        self.screen.ids.table_label.text_color = fg_main
+        self.screen.ids.graph_label.text_color = fg_main
+        self.screen.ids.chart_label.text_color = fg_main
+        self.screen.ids.sum_label.text_color = fg_main
+        self.screen.ids.result_label.text_color = fg_main
 
         for icon_id in ("icon_date", "icon_loan", "icon_months", "icon_interest"):
-            self.root.ids[icon_id].text_color = fg_main
+            self.screen.ids[icon_id].text_color = fg_main
 
-        self.set_textfield_colors(self.root.ids.start_date, fg_main, fg_soft, field_line)
-        self.set_textfield_colors(self.root.ids.loan, fg_main, fg_soft, field_line)
-        self.set_textfield_colors(self.root.ids.months, fg_main, fg_soft, field_line)
-        self.set_textfield_colors(self.root.ids.interest, fg_main, fg_soft, field_line)
-        self.set_textfield_colors(self.root.ids.payment_type, fg_main, fg_soft, field_line)
+        self.set_textfield_colors(self.screen.ids.start_date, fg_main, fg_soft, field_line)
+        self.set_textfield_colors(self.screen.ids.loan, fg_main, fg_soft, field_line)
+        self.set_textfield_colors(self.screen.ids.months, fg_main, fg_soft, field_line)
+        self.set_textfield_colors(self.screen.ids.interest, fg_main, fg_soft, field_line)
+        self.set_textfield_colors(self.screen.ids.payment_type, fg_main, fg_soft, field_line)
 
     def toggle_theme(self):
         self.theme_cls.theme_style = "Light" if self.theme_cls.theme_style == "Dark" else "Dark"
@@ -428,13 +454,13 @@ class MortgageCalculatorApp(MDApp):
         instance_tab_label.color = active
 
     def calculate(self):
-        loan_text = self.root.ids.loan.text.strip()
-        months_text = self.root.ids.months.text.strip()
-        interest_text = self.root.ids.interest.text.strip()
-        payment_type = self.root.ids.payment_type.text.strip()
+        loan_text = self.screen.ids.loan.text.strip()
+        months_text = self.screen.ids.months.text.strip()
+        interest_text = self.screen.ids.interest.text.strip()
+        payment_type = self.screen.ids.payment_type.text.strip()
 
         if not loan_text or not months_text or not interest_text:
-            self.root.ids.result_label.text = "Fill all fields"
+            self.screen.ids.result_label.text = "Fill all fields"
             return
 
         try:
@@ -442,11 +468,11 @@ class MortgageCalculatorApp(MDApp):
             months = int(months_text)
             interest = float(interest_text)
         except ValueError:
-            self.root.ids.result_label.text = "Wrong numbers"
+            self.screen.ids.result_label.text = "Wrong numbers"
             return
 
         if months <= 0:
-            self.root.ids.result_label.text = "Months must be > 0"
+            self.screen.ids.result_label.text = "Months must be > 0"
             return
 
         monthly_rate = interest / 100 / 12
@@ -459,11 +485,11 @@ class MortgageCalculatorApp(MDApp):
                     monthly_rate * (1 + monthly_rate) ** months
                 ) / ((1 + monthly_rate) ** months - 1)
 
-            self.root.ids.result_label.text = f"Monthly payment: {payment:.2f}"
+            self.screen.ids.result_label.text = f"Monthly payment: {payment:.2f}"
         else:
             principal_payment = loan / months
             first_payment = principal_payment + loan * monthly_rate
-            self.root.ids.result_label.text = f"First payment: {first_payment:.2f}"
+            self.screen.ids.result_label.text = f"First payment: {first_payment:.2f}"
 
     def on_star_click(self):
         print("star clicked!")

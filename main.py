@@ -82,13 +82,13 @@ Screen:
                     orientation: "vertical"
 
                     MDTopAppBar:
-    id: toolbar
-    title: app.title
-    elevation: 10
-    left_action_items: [['menu', lambda x: nav_drawer.set_state("open")]]
-    right_action_items: [["translate", lambda x: app.open_language_menu()], ["star-outline", lambda x: app.on_star_click()]]
-    md_bg_color: 0, 0, 0, 1
-    specific_text_color: 1, 1, 1, 1
+                        id: toolbar
+                        title: app.title
+                        elevation: 10
+                        left_action_items: [['menu', lambda x: nav_drawer.set_state("open")]]
+                        right_action_items: [["translate", lambda x: app.open_language_menu()], ["star-outline", lambda x: app.on_star_click()]]
+                        md_bg_color: 0, 0, 0, 1
+                        specific_text_color: 1, 1, 1, 1
 
                     MDTabs:
                         id: tabs

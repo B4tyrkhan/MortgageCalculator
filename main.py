@@ -1,11 +1,15 @@
+import datetime
+import calendar
+import webbrowser
+
 from kivy.lang import Builder
 from kivy.uix.boxlayout import BoxLayout
 from kivy.properties import StringProperty, ListProperty
 from kivy.clock import Clock
 from kivy.metrics import dp
 from kivy.graphics import Color, Rectangle, Line, Ellipse
-import datetime
-import calendar
+from kivy.utils import platform
+from kivy.core.clipboard import Clipboard
 
 from kivymd.app import MDApp
 from kivymd.uix.list import OneLineIconListItem, MDList
@@ -14,6 +18,8 @@ from kivymd.uix.floatlayout import MDFloatLayout
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.pickers import MDDatePicker
 from kivymd.uix.datatables import MDDataTable
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton
 
 
 KV = '''
@@ -373,16 +379,11 @@ class ContentNavigationDrawer(BoxLayout):
 class ItemDrawer(OneLineIconListItem):
     icon = StringProperty()
     text_color = ListProperty([1, 1, 1, 1])
+    action_key = StringProperty("")
 
     def on_release(self):
         app = MDApp.get_running_app()
-
-        if self.text in [app.tr("dark_light"), "Dark/Light", "Тема", "Ашық/Қараңғы"]:
-            app.toggle_theme()
-
-        elif self.text in [app.tr("language"), "Language", "Язык", "Тіл"]:
-            app.open_language_menu()
-
+        app.handle_drawer_action(self.action_key)
         self.parent.set_color_item(self)
 
 
@@ -408,6 +409,12 @@ class MortgageCalculatorApp(MDApp):
         self.chart_interest_total = 0.0
         self.chart_principal_total = 0.0
         self.current_language = "kz"
+        self.dialog = None
+
+        self.youtube_url = "https://www.youtube.com/"
+        self.github_url = "https://github.com/"
+        self.donate_url = "https://www.donationalerts.com/"
+        self.share_text = "Mortgage Calculator App"
 
         self.translations = {
             "en": {
@@ -445,6 +452,14 @@ class MortgageCalculatorApp(MDApp):
                 "principal_legend": "Principal",
                 "payment_type_annuity": "annuity",
                 "payment_type_diff": "differentiated",
+                "date_col": "Date",
+                "payment_col": "Payment",
+                "interest_col": "Interest",
+                "loan_body_col": "Loan body",
+                "debt_col": "Debt",
+                "share_copied": "Text copied to clipboard",
+                "share_only_android": "Android share works in APK on phone",
+                "about_text": "Mortgage calculator app\\nAuthor: Aliev Batyrkhann",
             },
             "ru": {
                 "title": "Ипотечный калькулятор",
@@ -481,6 +496,14 @@ class MortgageCalculatorApp(MDApp):
                 "principal_legend": "Основной долг",
                 "payment_type_annuity": "аннуитет",
                 "payment_type_diff": "дифференцированный",
+                "date_col": "Дата",
+                "payment_col": "Платеж",
+                "interest_col": "Проценты",
+                "loan_body_col": "Тело кредита",
+                "debt_col": "Долг",
+                "share_copied": "Текст скопирован в буфер обмена",
+                "share_only_android": "Настоящий share работает в APK на телефоне",
+                "about_text": "Приложение ипотечный калькулятор\\nАвтор: Алиев Батырхан",
             },
             "kz": {
                 "title": "Ипотекалық калькулятор",
@@ -517,6 +540,14 @@ class MortgageCalculatorApp(MDApp):
                 "principal_legend": "Негізгі қарыз",
                 "payment_type_annuity": "аннуитет",
                 "payment_type_diff": "сараланған",
+                "date_col": "Күні",
+                "payment_col": "Төлем",
+                "interest_col": "Пайыз",
+                "loan_body_col": "Негізгі қарыз",
+                "debt_col": "Қарыз қалдығы",
+                "share_copied": "Мәтін алмасу буферіне көшірілді",
+                "share_only_android": "Нағыз share телефондағы APK ішінде жұмыс істейді",
+                "about_text": "Ипотекалық калькулятор қосымшасы\\nАвтор: Алиев Батырхан",
             },
         }
 
@@ -623,9 +654,14 @@ class MortgageCalculatorApp(MDApp):
             self.menu.open()
 
     def set_payment_type(self, value):
-        self.screen.ids.payment_type.text = self.tr("payment_type_annuity") if value == "annuity" else self.tr("payment_type_diff")
+        if value == "annuity":
+            self.screen.ids.payment_type.text = self.tr("payment_type_annuity")
+        else:
+            self.screen.ids.payment_type.text = self.tr("payment_type_diff")
+
         self.screen.ids.payment_type.focus = False
         self.screen.ids.payment_type._payment_type_value = value
+
         if self.menu:
             self.menu.dismiss()
 
@@ -638,18 +674,20 @@ class MortgageCalculatorApp(MDApp):
         md_list = self.screen.ids.content_drawer.ids.md_list
         md_list.clear_widgets()
 
-        menu_items = {
-            "account-cowboy-hat": self.tr("about_author"),
-            "youtube": self.tr("my_youtube"),
-            "coffee": self.tr("donate_author"),
-            "github": self.tr("source_code"),
-            "share-variant": self.tr("share_app"),
-            "shield-sun": self.tr("dark_light"),
-            "translate": self.tr("language"),
-        }
+        menu_items = [
+            ("account-cowboy-hat", self.tr("about_author"), "about"),
+            ("youtube", self.tr("my_youtube"), "youtube"),
+            ("coffee", self.tr("donate_author"), "donate"),
+            ("github", self.tr("source_code"), "github"),
+            ("share-variant", self.tr("share_app"), "share"),
+            ("shield-sun", self.tr("dark_light"), "theme"),
+            ("translate", self.tr("language"), "language"),
+        ]
 
-        for icon_name, item_text in menu_items.items():
-            md_list.add_widget(ItemDrawer(icon=icon_name, text=item_text))
+        for icon_name, item_text, action_key in menu_items:
+            md_list.add_widget(
+                ItemDrawer(icon=icon_name, text=item_text, action_key=action_key)
+            )
 
     def apply_language(self):
         self.title = self.tr("title")
@@ -692,6 +730,10 @@ class MortgageCalculatorApp(MDApp):
         self.refresh_payment_menu()
         self.set_payment_type(current_type)
         self.rebuild_drawer()
+        self.refresh_ui_colors()
+
+        if self.table_widget:
+            self.calculate()
 
     def on_start(self):
         self.screen.ids.start_date.text = datetime.date.today().strftime("%d-%m-%Y")
@@ -815,11 +857,11 @@ class MortgageCalculatorApp(MDApp):
             check=False,
             column_data=[
                 ("№", dp(15)),
-                ("Date", dp(25)),
-                ("Payment", dp(25)),
-                ("Interest", dp(25)),
-                ("Loan body", dp(25)),
-                ("Debt", dp(25)),
+                (self.tr("date_col"), dp(25)),
+                (self.tr("payment_col"), dp(25)),
+                (self.tr("interest_col"), dp(25)),
+                (self.tr("loan_body_col"), dp(25)),
+                (self.tr("debt_col"), dp(25)),
             ],
             row_data=rows,
         )
@@ -1046,6 +1088,74 @@ class MortgageCalculatorApp(MDApp):
         self.show_table(rows)
         Clock.schedule_once(lambda dt: self.draw_graph(), 0.05)
         Clock.schedule_once(lambda dt: self.draw_chart(), 0.05)
+
+    def show_message(self, text):
+        if self.dialog:
+            self.dialog.dismiss()
+
+        self.dialog = MDDialog(
+            text=text,
+            buttons=[
+                MDFlatButton(
+                    text="OK",
+                    on_release=lambda x: self.dialog.dismiss()
+                )
+            ],
+        )
+        self.dialog.open()
+
+    def open_url(self, url):
+        try:
+            webbrowser.open(url)
+        except Exception as e:
+            self.show_message(str(e))
+
+    def share_app(self):
+        if platform == "android":
+            try:
+                from jnius import autoclass
+
+                PythonActivity = autoclass("org.kivy.android.PythonActivity")
+                Intent = autoclass("android.content.Intent")
+                String = autoclass("java.lang.String")
+
+                intent = Intent()
+                intent.setAction(Intent.ACTION_SEND)
+                intent.setType("text/plain")
+                intent.putExtra(Intent.EXTRA_TEXT, String(self.share_text))
+
+                chooser = Intent.createChooser(intent, String(self.tr("share_app")))
+                currentActivity = PythonActivity.mActivity
+                currentActivity.startActivity(chooser)
+            except Exception as e:
+                self.show_message(str(e))
+        else:
+            Clipboard.copy(self.share_text)
+            self.show_message(f"{self.tr('share_only_android')}\\n{self.tr('share_copied')}")
+
+    def handle_drawer_action(self, action_key):
+        self.screen.ids.nav_drawer.set_state("close")
+
+        if action_key == "about":
+            self.show_message(self.tr("about_text"))
+
+        elif action_key == "youtube":
+            self.open_url(self.youtube_url)
+
+        elif action_key == "donate":
+            self.open_url(self.donate_url)
+
+        elif action_key == "github":
+            self.open_url(self.github_url)
+
+        elif action_key == "share":
+            self.share_app()
+
+        elif action_key == "theme":
+            self.toggle_theme()
+
+        elif action_key == "language":
+            Clock.schedule_once(lambda dt: self.open_language_menu(), 0.2)
 
     def on_star_click(self):
         print("star clicked!")
